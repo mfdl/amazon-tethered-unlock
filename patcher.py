@@ -22,24 +22,16 @@ if sys.version_info[1] < 9:
 
 help_message = f"[?] Usage: {sys.argv[0]} [pl|lk] <input> <output>"
 
-# PL 1 -> Android 7 (cupcake, mantis, karnak) - OK
-# PL 2 -> Android 5 (suez, douglas, sloane) - OK
-# PL 3 -> Android 9 (sheldon, maverick, onyx) - TBD
+# PL 0 -> Android 9 (sheldon, maverick, onyx) - OK - mov.W R4,#0x0
+# PL 1 -> Android 7 (cupcake, mantis, karnak) - OK - MOV.W R5,#0x0
+# PL 2 -> Android 5 (suez, douglas, sloane) - OK - MOV.W R4,#0x0
+LK_VERIFY_ON = [b'yDY\x9aO\xf0\xff4', b'\x01\xe0O\xf0\xff5(F', b'\x01\xe0O\xf0\xff4 F']
+LK_VERIFY_OFF = [b'yDY\x9aO\xf0\x00\x04', b'\x01\xe0O\xf0\x00\x05(F', b'\x01\xe0O\xf0\x00\x04 F']
 
-# MOV.W    R4,#0xffffffff
-LK_VERIFY_ON = [b'\x01\xe0O\xf0\xff5(F', b'\x01\xe0O\xf0\xff4 F']
-
-# MOV.W    R4,#0x0
-LK_VERIFY_OFF = [b'\x01\xe0O\xf0\x00\x05(F', b'\x01\xe0O\xf0\x00\x04 F']
-
-# LK 1 -> Android 7 (cupcake, mantis, karnak) - TBD
-# PL 2 -> Android 5 (suez, douglas, sloane) - OK
-# LK 3 -> Android 9 (sheldon, maverick, onyx) - TBD
-
-# MOV.EQ   R0,#0x0
+# LK 1 -> Android 7 (cupcake, mantis, karnak) - TBD - MOV.W R8,#0x0
+# PL 2 -> Android 5 (suez, douglas, sloane) - OK - MOV.EQ r0,#0x1
+# LK 3 -> Android 9 (sheldon, maverick, onyx) - TBD - ???
 AMZN_IMAGE_VERIFY_ON = [b'O\xf0\x00\x08\x10\xe0)F']
-
-# MOV.W    R8,#0x1
 AMZN_IMAGE_VERIFY_OFF = [b'O\xf0\x01\x08\x10\xe0)F']
 
 def quit(i, o, e):
@@ -110,6 +102,8 @@ def patch_lk(input_file, output_file):
         if OFFSET == -1:
             quit(input_file, output_file, "[-] Couldn't find amzn_image_verify")
 
+    print(f"[?] LK with type {TYPE} detected.")
+
     input_file.seek(OFFSET + 8)
     amzn_image_verify = is_amzn_image_verify_enabled(input_file.read(1))
 
@@ -117,10 +111,10 @@ def patch_lk(input_file, output_file):
 
     if amzn_image_verify:
         print("[*] Disabling amzn_image_verify...")
-        patch_bit(input_file, output_file, OFFSET, AMZN_IMAGE_VERIFY_OFF[TYPE]) # return 1
+        patch_bit(input_file, output_file, OFFSET, AMZN_IMAGE_VERIFY_OFF[TYPE])
     else:
         print("[*] Enabling amzn_image_verify...")
-        patch_bit(input_file, output_file, OFFSET, AMZN_IMAGE_VERIFY_ON[TYPE]) # return (uVar1 & 1) != 0
+        patch_bit(input_file, output_file, OFFSET, AMZN_IMAGE_VERIFY_ON[TYPE])
 
     print(f"[+] Successfully patched LK and saved it as {sys.argv[3]}!")
     quit(input_file, output_file, 0)
@@ -137,18 +131,20 @@ def patch_pl(input_file, output_file):
     for _off in LK_VERIFY_ON:
         OFFSET = DATA.find(_off)
         if OFFSET != -1:
-            TYPE = (0 if b'\xff5' in _off else 1)            
+            TYPE = (0 if _off == LK_VERIFY_ON[0] else 1 if _off == LK_VERIFY_ON[1] else 2 if _off == LK_VERIFY_ON[2] else -1)
             break
     
     if OFFSET == -1:
         for _off in LK_VERIFY_OFF:
             OFFSET = DATA.find(_off)
             if OFFSET != -1:
-                TYPE = (0 if b'\xff5' in _off else 1)            
+                TYPE = (0 if _off == LK_VERIFY_OFF[0] else 1 if _off == LK_VERIFY_OFF[1] else 2 if _off == LK_VERIFY_OFF[2] else -1)
                 break
         
         if OFFSET == -1:
             quit(input_file, output_file, "[-] Couldn't find LK_VERIFY")
+
+    print(f"[?] PL with type {TYPE} detected.")
 
     input_file.seek(OFFSET + 4)
     lk_verify = is_pl_verify_enabled(input_file.read(1))
@@ -157,10 +153,10 @@ def patch_pl(input_file, output_file):
 
     if lk_verify:
         print("[*] Disabling LK verification...")
-        patch_bit(input_file, output_file, OFFSET, LK_VERIFY_OFF[TYPE]) # return 0
+        patch_bit(input_file, output_file, OFFSET, LK_VERIFY_OFF[TYPE])
     else:
         print("[*] Enabling LK verification...")
-        patch_bit(input_file, output_file, OFFSET, LK_VERIFY_ON[TYPE]) # return 0xffffff
+        patch_bit(input_file, output_file, OFFSET, LK_VERIFY_ON[TYPE])
 
     print(f"[+] Successfully patched PL and saved it as {sys.argv[3]}!")
     quit(input_file, output_file, 0)
