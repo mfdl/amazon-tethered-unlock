@@ -1,0 +1,11 @@
+# Preloader (PL)
+preloader*
+
+# Bootloader (LK)
+lk*
+
+# Binary files
+*.bin
+
+# Image files
+*.img
